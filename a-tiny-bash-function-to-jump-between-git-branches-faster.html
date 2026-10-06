@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>A tiny bash function to jump between git branches faster — DevSnip Daily</title>
+<style>
+:root{--bg:#fafafa;--fg:#1a1a1a;--ac:#c0392b}
+*{box-sizing:border-box}body{margin:0;font-family:Georgia,serif;background:var(--bg);color:var(--fg);line-height:1.7}
+header{border-bottom:3px solid var(--ac);padding:24px 16px}
+.wrap{max-width:720px;margin:0 auto;padding:0 16px}
+h1.brand{font-size:1.6rem;margin:0}.tag{color:#666;font-size:.9rem}
+article{padding:32px 0}h2{color:var(--ac)}
+.ad-wrap{margin:24px 0;padding:8px;background:#fff;border:1px dashed #ccc}
+pre{background:#2d2d2d;color:#eee;padding:12px;overflow:auto;border-radius:4px}
+footer{border-top:1px solid #ddd;padding:24px 0;color:#888;font-size:.85rem}
+nav a{color:var(--ac);margin-right:12px;text-decoration:none}
+</style></head><body>
+<header class="wrap"><h1 class="brand">DevSnip Daily</h1><div class="tag">Small code snippets that save real time.</div>
+<nav><a href="a-10-line-python-script-to-rename-files-in-bulk-safely.html">A 10-line Python script to r</a><a href="tmux-config-tweaks-that-make-sessions-survive-reboots.html">tmux config tweaks that make</a><a href="fzf-fuzzy-finding-your-shell-history-the-right-way.html">fzf: fuzzy-finding your shel</a><a href="jq-one-liners-for-cleaning-messy-json-logs.html">jq one-liners for cleaning m</a><a href="making-ls-readable-again-with-exa-and-aliases.html">Making ls readable again wit</a><a href="sed-substitutions-every-developer-should-memorize.html">sed substitutions every deve</a></nav></header>
+<div class="wrap"><article><h1>A tiny bash function to jump between git branches faster</h1><p>If you work across multiple branches daily, you already know the friction: <code>git checkout</code>, tab-complete, realize you can't remember if it was <code>feature/auth-refactor</code> or <code>feature/refactor-auth</code>, run <code>git branch</code>, scroll, copy, paste. It adds up. Here's a small bash function I've been using for a while that cuts that loop down significantly using <code>fzf</code> for fuzzy branch selection.</p>
+
+<h2>What we're building</h2>
+
+<p>A shell function called <code>gbr</code> (short for "git branch") that lists your local branches in a fuzzy finder and checks out whichever one you pick. No arguments needed. Just type <code>gbr</code>, start typing part of a branch name, hit Enter. Done.</p>
+
+<p>If you don't have <code>fzf</code> installed yet, grab it now — it's one of those tools you'll wonder how you lived without:</p>
+
+<pre><code># macOS
+brew install fzf
+
+# Ubuntu/Debian
+sudo apt install fzf</code></pre>
+
+<h2>The function</h2>
+
+<pre><code>gbr() {
+  local branch
+  branch=$(git branch --sort=-committerdate | grep -v '^\*' | sed 's/^[[:space:]]*//' | fzf --height=20 --prompt="branch: ")
+  [ -n "$branch" ] && git checkout "$branch"
+}</code></pre>
+
+<p>Drop this into your <code>~/.bashrc</code> or <code>~/.zshrc</code> and source it (<code>source ~/.bashrc</code>).</p>
+<div class="ad-wrap"><div class="ad-slot">
+  <script type="text/javascript" src="https://data527.click/96cb2bf4ca5b000a7e72/791a2249e9/?placementName=default" async></script>
+</div>
+</div>
+</p>
+
+<h2>Breaking it down</h2>
+
+<h3>Sorting by most recently used</h3>
+
+<p><code>git branch --sort=-committerdate</code> lists branches in reverse chronological order by their last commit. This matters more than alphabetical order because the branch you want is almost always one you touched recently. Your <code>main</code> and <code>develop</code> branches might be old commits, so they fall to the bottom — which is exactly where you want them in a jump function like this.</p>
+
+<h3>Stripping the current branch indicator</h3>
+
+<p><code>grep -v '^\*'</code> removes the line with the asterisk that marks your current branch. No point jumping to the branch you're already on. The <code>sed</code> command strips leading whitespace so <code>fzf</code> gets clean branch names without extra spaces causing issues on checkout.</p>
+
+<h3>The fzf options</h3>
+
+<p><code>--height=20</code> keeps the picker compact — it shows up inline rather than taking over your whole terminal. <code>--prompt="branch: "</code> is optional but gives you a visual cue. Adjust both to taste.</p>
+
+<h2>A few variants worth knowing about</h2>
+
+<h3>Include remote branches</h3>
+
+<p>If you frequently jump to remote branches you haven't checked out locally yet, swap <code>git branch</code> for <code>git branch -a</code> and strip the <code>remotes/origin/</code> prefix:</p>
+
+<pre><code>gbra() {
+  local branch
+  branch=$(git branch -a --sort=-committerdate \
+    | grep -v '^\*' \
+    | sed 's/^[[:space:]]*//' \
+    | sed 's|remotes/origin/||' \
+    | sort -u \
+    | fzf --height=20 --prompt="branch (all): ")
+  [ -n "$branch" ] && git checkout "$branch"
+}</code></pre>
+
+<p>The <code>sort -u</code> deduplicates entries that appear as both local and remote.</p>
+
+<h3>Show the last commit message as a preview</h3>
+
+<p>Once you have a lot of branches, names alone aren't always enough. Add a preview pane that shows the tip commit:</p>
+
+<pre><code>gbr() {
+  local branch
+  branch=$(git branch --sort=-committerdate | grep -v '^\*' | sed 's/^[[:space:]]*//' \
+    | fzf --height=30 \
+          --prompt="branch: " \
+          --preview="git log --oneline -10 {}")
+  [ -n "$branch" ] && git checkout "$branch"
+}</code></pre>
+
+<p>Now as you move through the list, you see the last 10 commits for each branch on the right side. Useful when you're trying to remember if <code>fix/login-bug</code> was the one with the session token work or the redirect fix.</p>
+
+<h2>Making it even faster</h2>
+
+<p>A function is great, but two keystrokes beat five. Add an alias on top of the function:</p>
+
+<pre><code>alias gb='gbr'</code></pre>
+
+<p>Now <code>gb</code> is your branch switcher. Muscle memory builds fast.</p>
+
+<ul>
+  <li>Type <code>gb</code> to open the picker</li>
+  <li>Type a few letters to fuzzy-filter</li>
+  <li>Arrow keys or keep typing to narrow down</li>
+  <li>Hit Enter to checkout</li>
+  <li>Hit Escape or Ctrl-C to cancel without switching</li>
+</ul>
+
+<h2>One thing to watch</h2>
+
+<p>If you're in a repo with a detached HEAD state, <code>git branch</code> will behave a bit oddly — you'll see <code>(HEAD detached at ...)</code> in the output. The <code>grep -v '^\*'</code> handles it because Git marks that line with an asterisk too, so it gets filtered out cleanly.</p>
+
+<p>This is a small thing but it's one of those quality-of-life improvements that compounds. The less friction between you and your work, the better. Spend five minutes wiring this up and you'll stop thinking about branch switching entirely.</p></article></div>
+<footer class="wrap">© 2026 DevSnip Daily</footer>
+</body></html>

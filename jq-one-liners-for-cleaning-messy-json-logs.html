@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>jq one-liners for cleaning messy JSON logs — DevSnip Daily</title>
+<style>
+:root{--bg:#fafafa;--fg:#1a1a1a;--ac:#c0392b}
+*{box-sizing:border-box}body{margin:0;font-family:Georgia,serif;background:var(--bg);color:var(--fg);line-height:1.7}
+header{border-bottom:3px solid var(--ac);padding:24px 16px}
+.wrap{max-width:720px;margin:0 auto;padding:0 16px}
+h1.brand{font-size:1.6rem;margin:0}.tag{color:#666;font-size:.9rem}
+article{padding:32px 0}h2{color:var(--ac)}
+.ad-wrap{margin:24px 0;padding:8px;background:#fff;border:1px dashed #ccc}
+pre{background:#2d2d2d;color:#eee;padding:12px;overflow:auto;border-radius:4px}
+footer{border-top:1px solid #ddd;padding:24px 0;color:#888;font-size:.85rem}
+nav a{color:var(--ac);margin-right:12px;text-decoration:none}
+</style></head><body>
+<header class="wrap"><h1 class="brand">DevSnip Daily</h1><div class="tag">Small code snippets that save real time.</div>
+<nav><a href="a-10-line-python-script-to-rename-files-in-bulk-safely.html">A 10-line Python script to r</a><a href="tmux-config-tweaks-that-make-sessions-survive-reboots.html">tmux config tweaks that make</a><a href="fzf-fuzzy-finding-your-shell-history-the-right-way.html">fzf: fuzzy-finding your shel</a><a href="jq-one-liners-for-cleaning-messy-json-logs.html">jq one-liners for cleaning m</a><a href="making-ls-readable-again-with-exa-and-aliases.html">Making ls readable again wit</a><a href="sed-substitutions-every-developer-should-memorize.html">sed substitutions every deve</a></nav></header>
+<div class="wrap"><article><h1>jq one-liners for cleaning messy JSON logs</h1><p>If you've ever stared at a wall of minified JSON logs trying to find one field, you know the pain. <code>jq</code> turns that chaos into something workable in seconds. Here are the one-liners I actually use when cleaning and triaging messy log data — no wrappers, no scripts, just raw shell commands you can paste and run.</p>
+
+<h2>The Basics You Probably Already Know (but let's be sure)</h2>
+
+<p>Pretty-printing is the entry point. If your logs are one giant blob per line:</p>
+
+<pre><code>cat app.log | jq '.'</code></pre>
+
+<p>That's table stakes. The real value starts when you're filtering, reshaping, and stripping noise out of logs that someone else designed at 2am.</p>
+
+<h2>Extracting Specific Fields Across Every Line</h2>
+
+<p>Log files typically have one JSON object per line. Pull just the fields you care about:</p>
+<div class="ad-wrap"><div class="ad-slot">
+  <script type="text/javascript" src="https://data527.click/96cb2bf4ca5b000a7e72/791a2249e9/?placementName=default" async></script>
+</div>
+</div>
+</p>
+
+<pre><code>jq '{timestamp: .ts, level: .severity, msg: .message}' app.log</code></pre>
+
+<p>This remaps ugly internal field names to something readable. Pair it with <code>-c</code> to keep output compact (one line per entry), which is useful if you're piping downstream:</p>
+
+<pre><code>jq -c '{timestamp: .ts, level: .severity, msg: .message}' app.log</code></pre>
+
+<h2>Filtering Out the Noise</h2>
+
+<h3>Skip low-level log entries</h3>
+
+<p>If your logs are flooded with DEBUG lines while you're hunting an error:</p>
+
+<pre><code>jq 'select(.level == "ERROR" or .level == "WARN")' app.log</code></pre>
+
+<p><code>select()</code> is your best friend here. It passes through only the objects where the condition is true, dropping everything else silently.</p>
+
+<h3>Filter by time range</h3>
+
+<p>Logs from a specific window, assuming ISO timestamps:</p>
+
+<pre><code>jq 'select(.timestamp >= "2024-11-01T10:00:00" and .timestamp <= "2024-11-01T11:00:00")' app.log</code></pre>
+
+<p>This works because ISO 8601 strings sort lexicographically. Not perfect for every timestamp format, but covers most structured log setups.</p>
+
+<h2>Dealing with Missing or Null Fields</h2>
+
+<p>Real logs are inconsistent. Some entries have a <code>user_id</code>, some don't. Trying to extract it blindly will give you a bunch of <code>null</code> values. Fix that:</p>
+
+<pre><code>jq 'select(.user_id != null) | .user_id' app.log</code></pre>
+
+<p>Or use the alternative operator to provide a fallback:</p>
+
+<pre><code>jq '.user_id // "anonymous"' app.log</code></pre>
+
+<p>The <code>//</code> operator returns the right side when the left is null or false. Huge for normalizing logs before sending them somewhere else.</p>
+
+<h2>Flattening Nested Garbage</h2>
+
+<p>Some logging libraries nest everything. You end up with structures like <code>.context.request.headers.x-trace-id</code>. Flatten what you need:</p>
+
+<pre><code>jq '{trace_id: .context.request.headers["x-trace-id"], status: .context.response.status}' app.log</code></pre>
+
+<p>If the nesting is truly arbitrary and you just want every key-value pair at one level:</p>
+
+<pre><code>jq '[leaf_paths as $p | {key: ($p | join(".")), value: getpath($p)}] | from_entries' app.log</code></pre>
+
+<p>That one's heavier, but it fully flattens any object into a single-depth map with dotted key names. Useful when you're dumping into a CSV or a key-value store.</p>
+
+<h2>Counting and Summarizing</h2>
+
+<p>Quick frequency count of log levels across the whole file:</p>
+
+<pre><code>jq -r '.level' app.log | sort | uniq -c | sort -rn</code></pre>
+
+<p>Yes, that's cheating by falling back to shell tools — but it's the practical move. <code>jq</code> handles the extraction, Unix handles the aggregation.</p>
+
+<p>If you want to stay purely in <code>jq</code>, slurp the file and group:</p>
+
+<pre><code>jq -s 'group_by(.level) | map({level: .[0].level, count: length})' app.log</code></pre>
+
+<p>The <code>-s</code> flag slurps all lines into a single array, then <code>group_by</code> does the rest. Watch memory usage on large files though.</p>
+
+<h2>Stripping Fields You Don't Want</h2>
+
+<p>Sometimes you're sending logs somewhere and need to drop sensitive or irrelevant fields before forwarding:</p>
+
+<pre><code>jq 'del(.password, .auth_token, .internal_debug)' app.log</code></pre>
+
+<p><code>del()</code> removes keys in place. Chain multiple fields in one call. Works on nested paths too: <code>del(.user.ssn)</code>.</p>
+
+<h2>Handling Broken Lines</h2>
+
+<p>Logs in the wild often have non-JSON lines mixed in — startup banners, stack traces, whatever. By default <code>jq</code> will just error and stop. Use this instead:</p>
+
+<pre><code>jq -R 'fromjson? | select(type == "object")' app.log</code></pre>
+
+<p><code>-R</code> reads each line as a raw string, <code>fromjson?</code> tries to parse it and suppresses errors, and <code>select(type == "object")</code> keeps only valid JSON objects. This combo handles garbage lines without babysitting the process.</p>
+
+<h2>Putting It Together</h2>
+
+<p>A realistic end-to-end example: grab all ERROR logs from the last hour, drop internal fields, and write clean compact JSON to a new file:</p>
+
+<pre><code>jq -Rc 'fromjson? | select(type == "object") | select(.level == "ERROR") | select(.timestamp >= "2024-11-01T09:00:00") | del(.internal, .debug_ctx)' app.log > errors_clean.log</code></pre>
+
+<p>That's one line doing parse-guarding, filtering, time scoping, and field removal all at once. No temp files, no intermediate scripts.</p>
+
+<p><code>jq</code> rewards spending 20 minutes with its manual. The patterns above cover 80% of log-cleaning work, but once you're comfortable with <code>select</code>, <code>del</code>, and the <code>?</code> error suppression operator, you'll start reaching for it before anything else when logs get messy.</p></article></div>
+<footer class="wrap">© 2026 DevSnip Daily</footer>
+</body></html>

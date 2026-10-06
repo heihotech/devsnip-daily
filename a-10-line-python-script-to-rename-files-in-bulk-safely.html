@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>A 10-line Python script to rename files in bulk safely — DevSnip Daily</title>
+<style>
+:root{--bg:#fafafa;--fg:#1a1a1a;--ac:#c0392b}
+*{box-sizing:border-box}body{margin:0;font-family:Georgia,serif;background:var(--bg);color:var(--fg);line-height:1.7}
+header{border-bottom:3px solid var(--ac);padding:24px 16px}
+.wrap{max-width:720px;margin:0 auto;padding:0 16px}
+h1.brand{font-size:1.6rem;margin:0}.tag{color:#666;font-size:.9rem}
+article{padding:32px 0}h2{color:var(--ac)}
+.ad-wrap{margin:24px 0;padding:8px;background:#fff;border:1px dashed #ccc}
+pre{background:#2d2d2d;color:#eee;padding:12px;overflow:auto;border-radius:4px}
+footer{border-top:1px solid #ddd;padding:24px 0;color:#888;font-size:.85rem}
+nav a{color:var(--ac);margin-right:12px;text-decoration:none}
+</style></head><body>
+<header class="wrap"><h1 class="brand">DevSnip Daily</h1><div class="tag">Small code snippets that save real time.</div>
+<nav><a href="a-10-line-python-script-to-rename-files-in-bulk-safely.html">A 10-line Python script to r</a><a href="tmux-config-tweaks-that-make-sessions-survive-reboots.html">tmux config tweaks that make</a><a href="fzf-fuzzy-finding-your-shell-history-the-right-way.html">fzf: fuzzy-finding your shel</a><a href="jq-one-liners-for-cleaning-messy-json-logs.html">jq one-liners for cleaning m</a><a href="making-ls-readable-again-with-exa-and-aliases.html">Making ls readable again wit</a><a href="sed-substitutions-every-developer-should-memorize.html">sed substitutions every deve</a></nav></header>
+<div class="wrap"><article><h1>A 10-line Python script to rename files in bulk safely</h1><p>Renaming a hundred files by hand is the kind of task that makes you question your career choices. Whether you're cleaning up a photo dump, normalizing log file names, or batch-converting underscores to hyphens, doing it manually is slow and error-prone. Here's a tight Python script that handles bulk renaming safely — with a dry-run mode so you don't accidentally nuke your files before you know it's working.</p>
+
+<h2>The Script</h2>
+
+<p>Drop this into a file called <code>bulk_rename.py</code>:</p>
+
+<pre><code>import os
+import sys
+
+def bulk_rename(directory, old, new, dry_run=True):
+    renamed = 0
+    for filename in os.listdir(directory):
+        if old in filename:
+            new_name = filename.replace(old, new)
+            src = os.path.join(directory, filename)
+            dst = os.path.join(directory, new_name)
+            if dry_run:
+                print(f"[DRY RUN] {filename} → {new_name}")
+            else:
+                os.rename(src, dst)
+                print(f"Renamed: {filename} → {new_name}")
+                renamed += 1
+    if not dry_run:
+        print(f"\nDone. {renamed} file(s) renamed.")
+
+directory = sys.argv[1]
+old_str  = sys.argv[2]
+new_str  = sys.argv[3]
+live_run = len(sys.argv) > 4 and sys.argv[4] == "--go"
+
+bulk_rename(directory, old_str, new_str, dry_run=not live_run)
+</code></pre>
+
+<p>That's 20 lines if you count the blanks, but the actual logic is ten. The key design decision is <strong>dry-run by default</strong>. You have to explicitly pass <code>--go</code> to commit changes. This one habit will save you from yourself more than once.</p>
+
+<h2>How to Use It</h2>
+
+<h3>Step 1: Preview what would change</h3>
+
+<p>Say you have a folder full of files named like <code>report_2024_jan.csv</code>, <code>report_2024_feb.csv</code>, and you want to swap underscores for hyphens:</p>
+<div class="ad-wrap"><div class="ad-slot">
+  <script type="text/javascript" src="https://data527.click/96cb2bf4ca5b000a7e72/791a2249e9/?placementName=default" async></script>
+</div>
+</div>
+</p>
+
+<pre><code>python bulk_rename.py ./reports "_" "-"
+</code></pre>
+
+<p>Output:</p>
+
+<pre><code>[DRY RUN] report_2024_jan.csv → report-2024-jan.csv
+[DRY RUN] report_2024_feb.csv → report-2024-feb.csv
+[DRY RUN] report_2024_mar.csv → report-2024-mar.csv
+</code></pre>
+
+<p>Nothing touched yet. You can look at the list, confirm it looks right, and then commit.</p>
+
+<h3>Step 2: Actually rename the files</h3>
+
+<pre><code>python bulk_rename.py ./reports "_" "-" --go
+</code></pre>
+
+<p>Now it runs for real. Files are renamed, and you get a count at the end.</p>
+
+<h2>Why Dry-Run by Default Matters</h2>
+
+<p>I've seen people write rename scripts that just execute immediately. The problem is <code>str.replace()</code> is greedy — it replaces every occurrence of the substring. If your pattern appears in a part of the filename you didn't expect, you'll get weird results. With dry-run mode, you catch that before it's a problem.</p>
+
+<p>Example: you want to rename files with <code>log</code> in the name, replacing it with <code>record</code>. You run the dry-run and notice it's also catching <code>catalog_export.csv</code>. Oops. You tighten your pattern, run again, and only then commit. That's the workflow dry-run enables.</p>
+
+<h2>Common Use Cases</h2>
+
+<ul>
+  <li><strong>Photo organization:</strong> Replace spaces with underscores in a camera dump — <code>" " "_"</code></li>
+  <li><strong>Lowercasing extensions:</strong> Swap <code>.JPG</code> for <code>.jpg</code> after importing from an older camera</li>
+  <li><strong>Version cleanup:</strong> Strip <code>_v1</code> or <code>_final</code> suffixes from a design folder (we've all been there)</li>
+  <li><strong>Log normalization:</strong> Rename <code>error-log</code> to <code>err-log</code> across a whole directory of rotated logs</li>
+  <li><strong>Removing prefixes:</strong> Drop a common prefix like <code>2024_backup_</code> from a batch of archived files</li>
+</ul>
+
+<h2>Extending It</h2>
+
+<p>The script is intentionally minimal so it's easy to adapt. A few quick additions worth considering:</p>
+
+<h3>Add regex support</h3>
+
+<p>Swap <code>filename.replace(old, new)</code> for <code>re.sub(old, new, filename)</code> and import <code>re</code>. Now your pattern argument can be a full regular expression. Useful for stripping date stamps or version numbers that vary.</p>
+
+<h3>Handle subdirectories</h3>
+
+<p>Replace <code>os.listdir()</code> with <code>os.walk()</code> if you need to recurse into nested folders. Be extra careful with dry-run when you do this — the file count gets large fast and mistakes compound.</p>
+
+<h3>Log the changes</h3>
+
+<p>Before renaming, write each <code>src → dst</code> pair to a text file. That gives you an undo reference if something goes sideways. <code>os.rename(dst, src)</code> reverses any individual rename if needed.</p>
+
+<h2>One Gotcha to Know About</h2>
+
+<p><code>os.rename()</code> will silently overwrite an existing file on some operating systems (Linux, macOS). If two source files would resolve to the same destination name, you'll lose one. Before going live on anything important, either check for collisions manually during the dry-run output or add a quick <code>os.path.exists(dst)</code> guard and skip with a warning.</p>
+
+<p>Bulk renaming doesn't need to be scary. Ten lines, a dry-run flag, and a quick sanity check before you commit — that's the whole workflow. Copy this script somewhere on your path, and the next time you're staring down a folder of badly named files, you'll have it handled in under a minute.</p></article></div>
+<footer class="wrap">© 2026 DevSnip Daily</footer>
+</body></html>

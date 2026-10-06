@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>fzf: fuzzy-finding your shell history the right way — DevSnip Daily</title>
+<style>
+:root{--bg:#fafafa;--fg:#1a1a1a;--ac:#c0392b}
+*{box-sizing:border-box}body{margin:0;font-family:Georgia,serif;background:var(--bg);color:var(--fg);line-height:1.7}
+header{border-bottom:3px solid var(--ac);padding:24px 16px}
+.wrap{max-width:720px;margin:0 auto;padding:0 16px}
+h1.brand{font-size:1.6rem;margin:0}.tag{color:#666;font-size:.9rem}
+article{padding:32px 0}h2{color:var(--ac)}
+.ad-wrap{margin:24px 0;padding:8px;background:#fff;border:1px dashed #ccc}
+pre{background:#2d2d2d;color:#eee;padding:12px;overflow:auto;border-radius:4px}
+footer{border-top:1px solid #ddd;padding:24px 0;color:#888;font-size:.85rem}
+nav a{color:var(--ac);margin-right:12px;text-decoration:none}
+</style></head><body>
+<header class="wrap"><h1 class="brand">DevSnip Daily</h1><div class="tag">Small code snippets that save real time.</div>
+<nav><a href="a-10-line-python-script-to-rename-files-in-bulk-safely.html">A 10-line Python script to r</a><a href="tmux-config-tweaks-that-make-sessions-survive-reboots.html">tmux config tweaks that make</a><a href="fzf-fuzzy-finding-your-shell-history-the-right-way.html">fzf: fuzzy-finding your shel</a><a href="jq-one-liners-for-cleaning-messy-json-logs.html">jq one-liners for cleaning m</a><a href="making-ls-readable-again-with-exa-and-aliases.html">Making ls readable again wit</a><a href="sed-substitutions-every-developer-should-memorize.html">sed substitutions every deve</a></nav></header>
+<div class="wrap"><article><h1>fzf: fuzzy-finding your shell history the right way</h1><p>If you're still hitting the up arrow key to find a command you ran three days ago, you're leaving serious productivity on the table. <code>fzf</code> paired with your shell history turns a frustrating linear search into an instant fuzzy search across every command you've ever typed. Here's how to set it up properly and actually get the most out of it.</p>
+
+<h2>Why the Default History Search Sucks</h2>
+
+<p>Bash and Zsh both ship with <code>Ctrl+R</code> for reverse history search. It works, but it's sequential — you type a search term, and if the first match isn't what you want, you hit <code>Ctrl+R</code> again, and again, cycling through one result at a time. You need to remember exactly how you phrased a command to find it. That's a terrible interface for human memory.</p>
+
+<p><code>fzf</code> replaces this with a full-text fuzzy finder that shows all matches in a scrollable list, ranked by relevance. Type <code>docker</code> and you instantly see every Docker command you've ever run. Narrow it down with <code>docker run pg</code> and you're at the Postgres container command you want.</p>
+
+<h2>Installation</h2>
+
+<p>On macOS with Homebrew:</p>
+<div class="ad-wrap"><div class="ad-slot">
+  <script type="text/javascript" src="https://data527.click/96cb2bf4ca5b000a7e72/791a2249e9/?placementName=default" async></script>
+</div>
+</div>
+</p>
+
+<pre><code>brew install fzf
+$(brew --prefix)/opt/fzf/install</code></pre>
+
+<p>On Debian/Ubuntu:</p>
+
+<pre><code>sudo apt install fzf</code></pre>
+
+<p>The <code>install</code> script at the end is important — it sets up the shell keybindings and completions. Run it, say yes to everything, then restart your shell or source your config file.</p>
+
+<h2>The Keybinding That Changes Everything</h2>
+
+<p>Once fzf is installed and the keybindings are active, press <code>Ctrl+R</code> in your terminal. Instead of the default reverse search, you get an interactive fuzzy finder over your entire history. Start typing anything — partial words, out-of-order fragments — and the list filters live.</p>
+
+<p>A few things that aren't obvious at first:</p>
+
+<ul>
+  <li>You can type words in any order. <code>kubectl prod apply</code> finds <code>kubectl apply -f deployment.yaml --context=prod</code>.</li>
+  <li>Use <code>Ctrl+N</code> / <code>Ctrl+P</code> (or arrow keys) to move through results.</li>
+  <li>Press <code>Enter</code> to execute, or <code>Tab</code> to paste the command into your prompt without running it — useful when you want to edit it first.</li>
+  <li>Prefix a search term with <code>!</code> to exclude results. <code>!sudo grep</code> finds grep commands that aren't sudo.</li>
+</ul>
+
+<h2>Tuning fzf for History Specifically</h2>
+
+<p>The default fzf configuration is generic. For history search, you want to tweak a few things. Add these to your <code>~/.bashrc</code> or <code>~/.zshrc</code>:</p>
+
+<pre><code># Show more results and preview context
+export FZF_CTRL_R_OPTS="
+  --height 40%
+  --layout=reverse
+  --info=inline
+  --border
+  --bind 'ctrl-y:execute-silent(echo -n {2..} | pbcopy)+abort'
+"</code></pre>
+
+<p>The <code>ctrl-y</code> binding copies the selected command to your clipboard without executing it — handy when you're on a remote server and want to paste the command locally. On Linux, swap <code>pbcopy</code> for <code>xclip -selection clipboard</code> or <code>wl-copy</code> on Wayland.</p>
+
+<h3>Deduplicating History</h3>
+
+<p>Fuzzy search over 50 copies of <code>ls -la</code> is noise. Configure your shell to store only unique history entries:</p>
+
+<pre><code># Bash
+export HISTCONTROL=ignoreboth:erasedups
+export HISTSIZE=100000
+export HISTFILESIZE=200000
+
+# Zsh
+setopt HIST_IGNORE_ALL_DUPS
+setopt HIST_SAVE_NO_DUPS
+HISTSIZE=100000
+SAVEHIST=100000</code></pre>
+
+<p>Bump those history sizes up too. Disk space is cheap; losing the exact <code>ffmpeg</code> command that finally worked is not.</p>
+
+<h2>Going Further: atuin</h2>
+
+<p>If you want to go deeper, look at <a href="https://atuin.sh">atuin</a>. It replaces your shell history backend entirely with a SQLite database, gives you context-aware search (filter by directory, host, exit code), and optionally syncs history across machines end-to-end encrypted. It also hooks into <code>Ctrl+R</code>, so the muscle memory stays the same.</p>
+
+<p>That said, fzf alone covers 90% of the use case with zero overhead.</p>
+
+<h2>One More Trick: fzf as a Directory Jumper</h2>
+
+<p>While you're here — <code>Alt+C</code> (fzf's second major binding) fuzzy-finds directories under your current location and <code>cd</code>s into the selected one. No more <code>cd ../../projects/client/backend/src</code> typed by hand. Combined with <code>Ctrl+R</code>, these two bindings alone are worth the install.</p>
+
+<pre><code># Optional: include hidden dirs and configure the file finder
+export FZF_ALT_C_COMMAND="find . -type d -not -path '*/\.git/*'"</code></pre>
+
+<h2>The Bottom Line</h2>
+
+<p>Install fzf, run the install script, bump your history size, and add the dedup settings. That's maybe ten minutes of work. After that, finding any command you've ever run is a <code>Ctrl+R</code> and a few keystrokes away. It's one of those tools you install and then can't imagine working without.</p></article></div>
+<footer class="wrap">© 2026 DevSnip Daily</footer>
+</body></html>

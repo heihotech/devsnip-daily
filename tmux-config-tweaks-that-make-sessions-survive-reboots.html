@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>tmux config tweaks that make sessions survive reboots — DevSnip Daily</title>
+<style>
+:root{--bg:#fafafa;--fg:#1a1a1a;--ac:#c0392b}
+*{box-sizing:border-box}body{margin:0;font-family:Georgia,serif;background:var(--bg);color:var(--fg);line-height:1.7}
+header{border-bottom:3px solid var(--ac);padding:24px 16px}
+.wrap{max-width:720px;margin:0 auto;padding:0 16px}
+h1.brand{font-size:1.6rem;margin:0}.tag{color:#666;font-size:.9rem}
+article{padding:32px 0}h2{color:var(--ac)}
+.ad-wrap{margin:24px 0;padding:8px;background:#fff;border:1px dashed #ccc}
+pre{background:#2d2d2d;color:#eee;padding:12px;overflow:auto;border-radius:4px}
+footer{border-top:1px solid #ddd;padding:24px 0;color:#888;font-size:.85rem}
+nav a{color:var(--ac);margin-right:12px;text-decoration:none}
+</style></head><body>
+<header class="wrap"><h1 class="brand">DevSnip Daily</h1><div class="tag">Small code snippets that save real time.</div>
+<nav><a href="a-10-line-python-script-to-rename-files-in-bulk-safely.html">A 10-line Python script to r</a><a href="tmux-config-tweaks-that-make-sessions-survive-reboots.html">tmux config tweaks that make</a><a href="fzf-fuzzy-finding-your-shell-history-the-right-way.html">fzf: fuzzy-finding your shel</a><a href="jq-one-liners-for-cleaning-messy-json-logs.html">jq one-liners for cleaning m</a><a href="making-ls-readable-again-with-exa-and-aliases.html">Making ls readable again wit</a><a href="sed-substitutions-every-developer-should-memorize.html">sed substitutions every deve</a></nav></header>
+<div class="wrap"><article><h1>tmux config tweaks that make sessions survive reboots</h1><p>If you've ever lost a carefully arranged tmux session to a reboot or accidental logout, you know the pain of rebuilding your workspace from scratch. The good news: a handful of config tweaks and one solid plugin will make your sessions persist across reboots with almost zero manual effort. Here's exactly what I run.</p>
+
+<h2>The Core Tool: tmux-resurrect and tmux-continuum</h2>
+
+<p>The heavy lifting comes from two plugins by Bruno Sutic. <strong>tmux-resurrect</strong> saves and restores sessions manually. <strong>tmux-continuum</strong> automates that save on a timer and triggers restore on tmux server start. Use both together.</p>
+
+<p>If you're already using <a href="https://github.com/tmux-plugins/tpm">TPM (tmux Plugin Manager)</a>, drop these into your <code>~/.tmux.conf</code>:</p>
+
+<pre><code>set -g @plugin 'tmux-plugins/tpm'
+set -g @plugin 'tmux-plugins/tmux-resurrect'
+set -g @plugin 'tmux-plugins/tmux-continuum'
+
+# Auto-restore last saved environment on tmux start
+set -g @continuum-restore 'on'
+
+# Save interval in minutes (default is 15)
+set -g @continuum-save-interval '10'
+
+# Initialize TPM (keep this at the very bottom)
+run '~/.tmux/plugins/tpm/tpm'</code></pre>
+
+<p>Then hit <code>prefix + I</code> to install. After the next reboot, tmux will reload your windows, panes, and working directories automatically.</p>
+<div class="ad-wrap"><div class="ad-slot">
+  <script type="text/javascript" src="https://data527.click/96cb2bf4ca5b000a7e72/791a2249e9/?placementName=default" async></script>
+</div>
+</div>
+</p>
+
+<h2>Restore Pane Contents Too</h2>
+
+<p>By default, resurrect saves layout and working directories but not what's actually on your screen. Enable pane content capture:</p>
+
+<pre><code>set -g @resurrect-capture-pane-contents 'on'</code></pre>
+
+<p>This writes scrollback buffer snapshots to disk. It's not perfect for interactive programs, but for editors and log tails it's genuinely useful to see where you left off.</p>
+
+<h2>Restoring vim and neovim Sessions</h2>
+
+<p>tmux-resurrect has built-in support for restoring vim and neovim with their sessions intact, but you need to opt in:</p>
+
+<pre><code>set -g @resurrect-strategy-vim 'session'
+set -g @resurrect-strategy-nvim 'session'</code></pre>
+
+<p>This tells the plugin to call <code>vim -S</code> with your saved session file instead of just reopening a blank editor. You'll want to pair this with a vim session plugin like <strong>vim-obsession</strong> to make sure the session file stays current.</p>
+
+<h2>Keep tmux Running After Logout</h2>
+
+<p>The plugins handle restore, but they can't help if tmux itself dies because your system killed the server on logout. On Linux with systemd, the fix is to enable lingering for your user:</p>
+
+<pre><code>loginctl enable-linger $USER</code></pre>
+
+<p>This keeps user processes alive after logout. Combine it with a small systemd user service to start tmux automatically:</p>
+
+<pre><code># ~/.config/systemd/user/tmux.service
+[Unit]
+Description=tmux session
+After=network.target
+
+[Service]
+Type=forking
+ExecStart=/usr/bin/tmux new-session -d -s main
+ExecStop=/usr/bin/tmux kill-server
+KillMode=none
+Restart=on-failure
+
+[Install]
+WantedBy=default.target</code></pre>
+
+<pre><code>systemctl --user enable tmux.service
+systemctl --user start tmux.service</code></pre>
+
+<p>Now tmux starts on boot, continuum restores your layout, and you just SSH in and attach with <code>tmux a</code>.</p>
+
+<h2>A Few Quality-of-Life Config Additions</h2>
+
+<p>While you're in <code>~/.tmux.conf</code> anyway, these small tweaks pay dividends:</p>
+
+<ul>
+  <li><strong>Increase history limit</strong> — the default 2000 lines is too low for real work:</li>
+</ul>
+
+<pre><code>set -g history-limit 50000</code></pre>
+
+<ul>
+  <li><strong>Set a fast escape time</strong> — fixes the annoying delay when pressing Escape in vim:</li>
+</ul>
+
+<pre><code>set -sg escape-time 10</code></pre>
+
+<ul>
+  <li><strong>Enable mouse support</strong> — useful for scrolling and pane resizing without keyboard acrobatics:</li>
+</ul>
+
+<pre><code>set -g mouse on</code></pre>
+
+<ul>
+  <li><strong>Renumber windows automatically</strong> — so gaps don't appear when you close a window:</li>
+</ul>
+
+<pre><code>set -g renumber-windows on</code></pre>
+
+<h2>Verify Everything Is Working</h2>
+
+<p>After setting this up, do a real test before you trust it. Create a session with a specific layout, wait 10 minutes for continuum to autosave, then run:</p>
+
+<pre><code>cat ~/.tmux/resurrect/last</code></pre>
+
+<p>You'll see a plaintext snapshot of your panes, windows, and commands. If it looks right, reboot and watch your workspace come back. The first time it works, it feels like a small miracle.</p>
+
+<h3>Where Saves Live</h3>
+
+<p>Resurrect stores snapshots in <code>~/.tmux/resurrect/</code>. Each save is a timestamped file, and <code>last</code> is a symlink to the most recent one. You can manually save anytime with <code>prefix + Ctrl-s</code> and restore with <code>prefix + Ctrl-r</code> — handy if you're about to do something risky and want a checkpoint.</p>
+
+<p>The whole setup takes maybe 15 minutes to get right and then you stop thinking about it. Which is exactly what good tooling should do.</p></article></div>
+<footer class="wrap">© 2026 DevSnip Daily</footer>
+</body></html>

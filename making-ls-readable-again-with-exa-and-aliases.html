@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Making ls readable again with exa and aliases — DevSnip Daily</title>
+<style>
+:root{--bg:#fafafa;--fg:#1a1a1a;--ac:#c0392b}
+*{box-sizing:border-box}body{margin:0;font-family:Georgia,serif;background:var(--bg);color:var(--fg);line-height:1.7}
+header{border-bottom:3px solid var(--ac);padding:24px 16px}
+.wrap{max-width:720px;margin:0 auto;padding:0 16px}
+h1.brand{font-size:1.6rem;margin:0}.tag{color:#666;font-size:.9rem}
+article{padding:32px 0}h2{color:var(--ac)}
+.ad-wrap{margin:24px 0;padding:8px;background:#fff;border:1px dashed #ccc}
+pre{background:#2d2d2d;color:#eee;padding:12px;overflow:auto;border-radius:4px}
+footer{border-top:1px solid #ddd;padding:24px 0;color:#888;font-size:.85rem}
+nav a{color:var(--ac);margin-right:12px;text-decoration:none}
+</style></head><body>
+<header class="wrap"><h1 class="brand">DevSnip Daily</h1><div class="tag">Small code snippets that save real time.</div>
+<nav><a href="a-10-line-python-script-to-rename-files-in-bulk-safely.html">A 10-line Python script to r</a><a href="tmux-config-tweaks-that-make-sessions-survive-reboots.html">tmux config tweaks that make</a><a href="fzf-fuzzy-finding-your-shell-history-the-right-way.html">fzf: fuzzy-finding your shel</a><a href="jq-one-liners-for-cleaning-messy-json-logs.html">jq one-liners for cleaning m</a><a href="making-ls-readable-again-with-exa-and-aliases.html">Making ls readable again wit</a><a href="sed-substitutions-every-developer-should-memorize.html">sed substitutions every deve</a></nav></header>
+<div class="wrap"><article><h1>Making ls readable again with exa and aliases</h1><p>If you've been staring at the same wall of monochrome text from <code>ls</code> for years, you're leaving a lot of information on the table. <code>exa</code> is a modern replacement written in Rust that adds color, icons, Git status, and a saner default output — without making you learn a new mental model. Pair it with a few shell aliases and your terminal file browsing gets meaningfully better in about five minutes.</p>
+
+<h2>Installing exa</h2>
+
+<p>On macOS, Homebrew is the fastest path:</p>
+
+<pre><code>brew install exa</code></pre>
+
+<p>On Ubuntu/Debian:</p>
+
+<pre><code>sudo apt install exa</code></pre>
+
+<p>On Arch:</p>
+<div class="ad-wrap"><div class="ad-slot">
+  <script type="text/javascript" src="https://data527.click/96cb2bf4ca5b000a7e72/791a2249e9/?placementName=default" async></script>
+</div>
+</div>
+</p>
+
+<pre><code>sudo pacman -S exa</code></pre>
+
+<p>Once installed, run <code>exa</code> in any directory. You'll immediately see color-coded output: directories in blue, executables in green, symlinks in cyan. No flags needed to get there — it's the default.</p>
+
+<h2>The flags you'll actually use</h2>
+
+<p>Before setting up aliases, it helps to know which flags earn their keep day-to-day.</p>
+
+<h3>Long format with human-readable sizes</h3>
+
+<pre><code>exa -lh</code></pre>
+
+<p>This is the equivalent of <code>ls -lh</code>, but the output is color-coded by column — permissions in one color, file size in another, timestamps in another. Much easier to scan quickly.</p>
+
+<h3>Tree view</h3>
+
+<pre><code>exa --tree --level=2</code></pre>
+
+<p>This replaces the need to reach for <code>tree</code> (which you may or may not have installed). The <code>--level</code> flag keeps it from dumping your entire <code>node_modules</code> into the terminal.</p>
+
+<h3>Git status column</h3>
+
+<pre><code>exa -lh --git</code></pre>
+
+<p>Inside a Git repo, this adds a two-character column showing each file's Git status — whether it's untracked, modified, staged, or clean. You get a quick snapshot of what's changed without running <code>git status</code> separately.</p>
+
+<h3>Show hidden files</h3>
+
+<pre><code>exa -lha</code></pre>
+
+<p>Same as <code>ls -lha</code>. The <code>-a</code> flag includes dotfiles. Nothing surprising here, which is the point — the mental model transfers directly.</p>
+
+<h2>Setting up useful aliases</h2>
+
+<p>The real payoff comes from making these flags your defaults. Open your <code>~/.bashrc</code> or <code>~/.zshrc</code> and add a block like this:</p>
+
+<pre><code># Replace ls with exa
+alias ls='exa --color=always --group-directories-first'
+alias ll='exa -lh --color=always --group-directories-first'
+alias la='exa -lha --color=always --group-directories-first'
+alias lt='exa --tree --level=2 --color=always'
+alias lg='exa -lh --git --color=always --group-directories-first'</code></pre>
+
+<p>A few notes on what's in here:</p>
+
+<ul>
+  <li><code>--group-directories-first</code> sorts directories above files, which matches how most people actually think about a folder's contents.</li>
+  <li><code>--color=always</code> forces color even when piping, which you sometimes want. If you pipe to <code>grep</code> and color codes get in the way, you can drop this flag or add a no-color alias separately.</li>
+  <li><code>lg</code> is the one you'll use constantly inside project repos — it combines the long view with the Git column so you can see file sizes and modified status at a glance.</li>
+</ul>
+
+<p>After editing, reload your shell config:</p>
+
+<pre><code>source ~/.zshrc   # or ~/.bashrc</code></pre>
+
+<h2>A practical example</h2>
+
+<p>Say you're jumping into an unfamiliar project. Running <code>lg</code> in the root gives you:</p>
+
+<ul>
+  <li>Directory structure with folders listed first</li>
+  <li>File sizes so you can immediately spot a 40MB log file that shouldn't be there</li>
+  <li>Git column showing which files have been modified since the last commit</li>
+  <li>Color-coded permissions so symlinks and executables stand out</li>
+</ul>
+
+<p>That's four useful signals in a single command you'd have typed anyway.</p>
+
+<h2>One potential gotcha</h2>
+
+<p>If you're on a system where you <em>don't</em> have exa installed (a remote server, a Docker container, a colleague's machine), your muscle memory for <code>ll</code> will fail. The fix is to make your aliases conditional:</p>
+
+<pre><code>if command -v exa &> /dev/null; then
+  alias ls='exa --color=always --group-directories-first'
+  alias ll='exa -lh --color=always --group-directories-first'
+  alias la='exa -lha --color=always --group-directories-first'
+else
+  alias ll='ls -lh'
+  alias la='ls -lha'
+fi</code></pre>
+
+<p>This way your dotfiles work on any machine without breaking anything. The <code>command -v</code> check is portable across bash and zsh.</p>
+
+<h2>Worth knowing: eza</h2>
+
+<p>Development on the original <code>exa</code> repo stalled for a while and a community fork called <code>eza</code> has taken over active maintenance. It's a drop-in replacement with the same flags. If you're setting this up fresh, check whether your package manager has <code>eza</code> available — it may be the more actively maintained option going forward. Either way, the aliases above work unchanged.</p>
+
+<p>Five minutes of setup, and <code>ls</code> stops being a chore you tolerate and starts being something that actually helps you read a directory.</p></article></div>
+<footer class="wrap">© 2026 DevSnip Daily</footer>
+</body></html>

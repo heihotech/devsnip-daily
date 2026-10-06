@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Stop typing long docker commands: alias patterns that stick — DevSnip Daily</title>
+<style>
+:root{--bg:#fafafa;--fg:#1a1a1a;--ac:#c0392b}
+*{box-sizing:border-box}body{margin:0;font-family:Georgia,serif;background:var(--bg);color:var(--fg);line-height:1.7}
+header{border-bottom:3px solid var(--ac);padding:24px 16px}
+.wrap{max-width:720px;margin:0 auto;padding:0 16px}
+h1.brand{font-size:1.6rem;margin:0}.tag{color:#666;font-size:.9rem}
+article{padding:32px 0}h2{color:var(--ac)}
+.ad-wrap{margin:24px 0;padding:8px;background:#fff;border:1px dashed #ccc}
+pre{background:#2d2d2d;color:#eee;padding:12px;overflow:auto;border-radius:4px}
+footer{border-top:1px solid #ddd;padding:24px 0;color:#888;font-size:.85rem}
+nav a{color:var(--ac);margin-right:12px;text-decoration:none}
+</style></head><body>
+<header class="wrap"><h1 class="brand">DevSnip Daily</h1><div class="tag">Small code snippets that save real time.</div>
+<nav><a href="a-10-line-python-script-to-rename-files-in-bulk-safely.html">A 10-line Python script to r</a><a href="tmux-config-tweaks-that-make-sessions-survive-reboots.html">tmux config tweaks that make</a><a href="fzf-fuzzy-finding-your-shell-history-the-right-way.html">fzf: fuzzy-finding your shel</a><a href="jq-one-liners-for-cleaning-messy-json-logs.html">jq one-liners for cleaning m</a><a href="making-ls-readable-again-with-exa-and-aliases.html">Making ls readable again wit</a><a href="sed-substitutions-every-developer-should-memorize.html">sed substitutions every deve</a></nav></header>
+<div class="wrap"><article><h1>Stop typing long docker commands: alias patterns that stick</h1><p>If you've typed <code>docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"</code> more than twice this week, you're wasting keystrokes. Docker's CLI is powerful but verbose by design — it optimizes for clarity, not speed. That's your job. A handful of well-chosen aliases will cut your daily Docker typing by a significant margin without requiring any new tools or plugins.</p>
+
+<h2>The core principle: alias what you actually type</h2>
+
+<p>Don't copy someone else's alias file wholesale. Most of it won't match your workflow. Instead, open a new terminal, run <code>history | grep docker | awk '{print $2, $3}' | sort | uniq -c | sort -rn | head -20</code>, and look at your own patterns. Alias the top results. Here's mine as a starting point:</p>
+
+<pre><code># ~/.zshrc or ~/.bashrc
+
+alias dk='docker'
+alias dkps='docker ps'
+alias dkpsa='docker ps -a'
+alias dkst='docker stats --no-stream'
+alias dkl='docker logs --tail=100 -f'
+alias dki='docker images'
+alias dkrm='docker rm $(docker ps -aq)'
+alias dkrmi='docker rmi $(docker images -q)'
+alias dkprune='docker system prune -af --volumes'
+</code></pre>
+
+<p>Short, predictable, easy to remember. The <code>dk</code> prefix keeps everything grouped in your autocomplete.</p>
+
+<h2>Container lifecycle shortcuts</h2>
+
+<p>Starting, stopping, and exec-ing into containers is where you spend most of your time during development. These patterns cover the common cases:</p>
+<div class="ad-wrap"><div class="ad-slot">
+  <script type="text/javascript" src="https://data527.click/96cb2bf4ca5b000a7e72/791a2249e9/?placementName=default" async></script>
+</div>
+</div>
+</p>
+
+<pre><code># Stop all running containers
+alias dkstop='docker stop $(docker ps -q)'
+
+# Run a throwaway container with your current directory mounted
+alias dkrun='docker run --rm -it -v "$(pwd)":/workspace'
+
+# Exec into a running container interactively
+dkex() {
+  docker exec -it "$1" "${2:-sh}"
+}
+</code></pre>
+
+<p>That <code>dkex</code> function is more useful than a plain alias because it takes arguments. Call it with <code>dkex my-api bash</code> or just <code>dkex my-api</code> to default to <code>sh</code> — handy for Alpine-based images where bash isn't installed.</p>
+
+<h2>The format flag problem</h2>
+
+<p>Docker's default <code>ps</code> output is wide and truncated in annoying places. You almost always want a custom format, but typing <code>--format</code> every time is painful. Fix it two ways:</p>
+
+<h3>Option 1: alias with baked-in format</h3>
+
+<pre><code>alias dkps='docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"'
+</code></pre>
+
+<h3>Option 2: Docker config file (persistent, no alias needed)</h3>
+
+<pre><code># ~/.docker/config.json
+{
+  "psFormat": "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
+}
+</code></pre>
+
+<p>The config file approach is better if you work across multiple machines — commit it to your dotfiles repo and you're done. The alias wins if you want context-specific formats per project.</p>
+
+<h2>Docker Compose deserves its own layer</h2>
+
+<p>If you use Compose daily (and you probably do), these save real time:</p>
+
+<pre><code>alias dc='docker compose'
+alias dcu='docker compose up -d'
+alias dcd='docker compose down'
+alias dcr='docker compose restart'
+alias dcl='docker compose logs --tail=100 -f'
+alias dcb='docker compose up -d --build'
+
+# Rebuild a single service without stopping others
+dcbuild() {
+  docker compose up -d --build "$1"
+}
+</code></pre>
+
+<p>Notice <code>dcu</code> defaults to detached mode. If you want foreground output, just run <code>dc up</code> — you still have the flexibility.</p>
+
+<h2>Cleanup commands you'll actually remember</h2>
+
+<p>Disk cleanup is the thing everyone does manually until they run out of space. Alias it now:</p>
+
+<pre><code># Remove dangling images only (safer)
+alias dkclean='docker image prune -f'
+
+# Nuclear option: remove everything unused
+alias dknuke='docker system prune -af --volumes'
+
+# See what's eating disk
+alias dkdf='docker system df'
+</code></pre>
+
+<p>Keep <code>dkclean</code> and <code>dknuke</code> distinct. You want a speed bump before running the destructive one.</p>
+
+<h2>Making aliases stick across machines</h2>
+
+<p>The reason most alias setups fail isn't the aliases themselves — it's that they live only on one machine. Fix this with a dedicated file:</p>
+
+<ul>
+  <li>Create <code>~/.docker_aliases</code> and put all Docker aliases there</li>
+  <li>Source it from your <code>.zshrc</code> or <code>.bashrc</code>: <code>[ -f ~/.docker_aliases ] && source ~/.docker_aliases</code></li>
+  <li>Track it in your dotfiles repo alongside your <code>.gitconfig</code> and <code>.vimrc</code></li>
+  <li>Use a tool like <a href="https://www.chezmoi.io/">chezmoi</a> or bare git repo to sync dotfiles across machines</li>
+</ul>
+
+<p>This way your aliases are version-controlled, portable, and independent of your shell config clutter.</p>
+
+<h2>One rule to keep it maintainable</h2>
+
+<p>Aliases rot. You add them when you need them, forget they exist, and six months later you have 40 aliases and use 8. Set a calendar reminder every quarter to run that <code>history | grep docker</code> command again. Delete anything that doesn't show up in your top 20. The best alias file is the one you've actually memorized — and you can only memorize a small number of things.</p>
+
+<p>Start with five aliases today. Add more only when you catch yourself typing the same thing twice in one session. That friction is the signal.</p></article></div>
+<footer class="wrap">© 2026 DevSnip Daily</footer>
+</body></html>

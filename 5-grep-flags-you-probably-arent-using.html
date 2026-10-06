@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>5 grep flags you probably aren&#x27;t using — DevSnip Daily</title>
+<style>
+:root{--bg:#fafafa;--fg:#1a1a1a;--ac:#c0392b}
+*{box-sizing:border-box}body{margin:0;font-family:Georgia,serif;background:var(--bg);color:var(--fg);line-height:1.7}
+header{border-bottom:3px solid var(--ac);padding:24px 16px}
+.wrap{max-width:720px;margin:0 auto;padding:0 16px}
+h1.brand{font-size:1.6rem;margin:0}.tag{color:#666;font-size:.9rem}
+article{padding:32px 0}h2{color:var(--ac)}
+.ad-wrap{margin:24px 0;padding:8px;background:#fff;border:1px dashed #ccc}
+pre{background:#2d2d2d;color:#eee;padding:12px;overflow:auto;border-radius:4px}
+footer{border-top:1px solid #ddd;padding:24px 0;color:#888;font-size:.85rem}
+nav a{color:var(--ac);margin-right:12px;text-decoration:none}
+</style></head><body>
+<header class="wrap"><h1 class="brand">DevSnip Daily</h1><div class="tag">Small code snippets that save real time.</div>
+<nav><a href="a-10-line-python-script-to-rename-files-in-bulk-safely.html">A 10-line Python script to r</a><a href="tmux-config-tweaks-that-make-sessions-survive-reboots.html">tmux config tweaks that make</a><a href="fzf-fuzzy-finding-your-shell-history-the-right-way.html">fzf: fuzzy-finding your shel</a><a href="jq-one-liners-for-cleaning-messy-json-logs.html">jq one-liners for cleaning m</a><a href="making-ls-readable-again-with-exa-and-aliases.html">Making ls readable again wit</a><a href="sed-substitutions-every-developer-should-memorize.html">sed substitutions every deve</a></nav></header>
+<div class="wrap"><article><h1>5 grep flags you probably aren&#x27;t using</h1><p>You use <code>grep</code> every day. Probably with <code>-r</code> to search recursively, maybe <code>-i</code> for case-insensitive, and <code>-n</code> to get line numbers. That's the core 80%. But there's a handful of flags that don't show up in tutorials and can genuinely save you time when you're deep in a debugging session or parsing logs. Here are five worth adding to your muscle memory.</p>
+
+<h2>1. <code>-o</code> — Print only the matching part</h2>
+
+<p>By default, grep prints the whole line containing a match. Sometimes you just want the match itself — no surrounding noise. <code>-o</code> does exactly that, one match per line.</p>
+
+<pre><code>echo "Error: connection timeout after 30s" | grep -oE '[0-9]+s'
+# Output: 30s</code></pre>
+
+<p>This is especially useful when combined with <code>-E</code> for extended regex. Think extracting all IP addresses from a log file, or pulling every URL out of an HTML blob. Pipe the output to <code>sort | uniq -c</code> and you've got a quick frequency analysis without touching awk or Python.</p>
+
+<h2>2. <code>-C</code> — Context lines (above and below)</h2>
+
+<p>You probably know <code>-A</code> (lines after) and <code>-B</code> (lines before). <code>-C</code> gives you both at once. Pass it a number and you get that many lines of context on each side of the match.</p>
+<div class="ad-wrap"><div class="ad-slot">
+  <script type="text/javascript" src="https://data527.click/96cb2bf4ca5b000a7e72/791a2249e9/?placementName=default" async></script>
+</div>
+</div>
+</p>
+
+<pre><code>grep -C 3 "NullPointerException" application.log</code></pre>
+
+<p>Three lines before and three lines after — enough to see what triggered the exception and what happened next. I use this constantly when reviewing stack traces in logs where the actual useful line is two lines above the keyword I'm searching for. <code>-C 5</code> is my go-to for most debugging sessions.</p>
+
+<h2>3. <code>--include</code> and <code>--exclude</code> — Filter by filename during recursive search</h2>
+
+<p>When you're searching recursively through a project, you often don't care about minified JS, vendored dependencies, or test fixtures. Instead of post-filtering with more pipes, just tell grep upfront which files to look at.</p>
+
+<pre><code># Only search Python files
+grep -r "TODO" ./src --include="*.py"
+
+# Ignore generated files
+grep -r "API_KEY" . --exclude="*.min.js" --exclude-dir=".git"</code></pre>
+
+<p><code>--exclude-dir</code> is the one that really matters in practice. Searching a Node project without excluding <code>node_modules</code>? You'll be waiting a while and drowning in results. Stack these flags — they're fully composable.</p>
+
+<h2>4. <code>-l</code> and <code>-L</code> — List files, not matches</h2>
+
+<p>Sometimes you don't care about the specific lines — you just want to know which files contain (or don't contain) a pattern. <code>-l</code> prints filenames with at least one match. <code>-L</code> prints files with zero matches.</p>
+
+<pre><code># Which config files are missing the required header?
+grep -rL "# managed by terraform" ./infra/</code></pre>
+
+<p>That <code>-L</code> use case is the one people sleep on. It's perfect for compliance checks — find every file that's missing a license header, a required import, a shebang line. Way faster than writing a shell loop to do the same thing.</p>
+
+<pre><code># Which services have logging configured?
+grep -rl "log_level" ./services/</code></pre>
+
+<h2>5. <code>-P</code> — Perl-compatible regex</h2>
+
+<p>The default regex in grep (even with <code>-E</code> for extended) lacks some features you might reach for without thinking: lookaheads, lookbehinds, non-greedy quantifiers, <code>\d</code>, <code>\w</code>, and so on. <code>-P</code> enables Perl-compatible regular expressions, which unlocks all of that.</p>
+
+<pre><code># Match lines where "error" appears but "timeout" does not follow it
+grep -P "error(?!.*timeout)" server.log
+
+# Extract just the version numbers from a package file
+grep -oP '(?<="version": ")[^"]+' package.json</code></pre>
+
+<p>That second example — using a lookbehind to extract the value after a JSON key — is the kind of thing that would otherwise mean firing up Python or jq. It's not always the right tool, but knowing it's there means you reach for the right one faster.</p>
+
+<p>Note: <code>-P</code> isn't available on macOS's default BSD grep. You'll need to install GNU grep via Homebrew (<code>brew install grep</code>, then use <code>ggrep</code>) or use ripgrep, which supports Perl-style regex by default.</p>
+
+<h2>Putting it together</h2>
+
+<p>These flags aren't exotic — they're in the man page. But most people learn grep for a specific task and stop there. The real payoff is combining them:</p>
+
+<pre><code>grep -rnoP '(?<=password=)\S+' ./config/ --include="*.env" -l</code></pre>
+
+<p>Recursive, line-numbered, match-only, Perl regex, scoped to <code>.env</code> files, listing filenames. That's a lot of useful behavior from one command. Spend ten minutes with <code>man grep</code> and you'll find a few more worth keeping around.</p></article></div>
+<footer class="wrap">© 2026 DevSnip Daily</footer>
+</body></html>

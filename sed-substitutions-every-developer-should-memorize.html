@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>sed substitutions every developer should memorize — DevSnip Daily</title>
+<style>
+:root{--bg:#fafafa;--fg:#1a1a1a;--ac:#c0392b}
+*{box-sizing:border-box}body{margin:0;font-family:Georgia,serif;background:var(--bg);color:var(--fg);line-height:1.7}
+header{border-bottom:3px solid var(--ac);padding:24px 16px}
+.wrap{max-width:720px;margin:0 auto;padding:0 16px}
+h1.brand{font-size:1.6rem;margin:0}.tag{color:#666;font-size:.9rem}
+article{padding:32px 0}h2{color:var(--ac)}
+.ad-wrap{margin:24px 0;padding:8px;background:#fff;border:1px dashed #ccc}
+pre{background:#2d2d2d;color:#eee;padding:12px;overflow:auto;border-radius:4px}
+footer{border-top:1px solid #ddd;padding:24px 0;color:#888;font-size:.85rem}
+nav a{color:var(--ac);margin-right:12px;text-decoration:none}
+</style></head><body>
+<header class="wrap"><h1 class="brand">DevSnip Daily</h1><div class="tag">Small code snippets that save real time.</div>
+<nav><a href="a-10-line-python-script-to-rename-files-in-bulk-safely.html">A 10-line Python script to r</a><a href="tmux-config-tweaks-that-make-sessions-survive-reboots.html">tmux config tweaks that make</a><a href="fzf-fuzzy-finding-your-shell-history-the-right-way.html">fzf: fuzzy-finding your shel</a><a href="jq-one-liners-for-cleaning-messy-json-logs.html">jq one-liners for cleaning m</a><a href="making-ls-readable-again-with-exa-and-aliases.html">Making ls readable again wit</a><a href="sed-substitutions-every-developer-should-memorize.html">sed substitutions every deve</a></nav></header>
+<div class="wrap"><article><h1>sed substitutions every developer should memorize</h1><p>If you spend any time in a terminal, <code>sed</code> is one of those tools that pays back the investment immediately. The substitution command in particular — <code>s/find/replace/</code> — handles 80% of the text manipulation tasks you'd otherwise fire up a script or open a GUI for. Here are the patterns worth keeping in muscle memory.</p>
+
+<h2>The Basic Structure</h2>
+
+<p>Before the patterns, a quick refresher. The substitution syntax is:</p>
+
+<pre><code>sed 's/PATTERN/REPLACEMENT/FLAGS'</code></pre>
+
+<p>Common flags: <code>g</code> replaces all occurrences on a line (not just the first), <code>i</code> makes the match case-insensitive, and <code>2</code> (or any number) targets a specific occurrence. On macOS, remember to add <code>''</code> after <code>-i</code> for in-place edits — GNU sed on Linux doesn't require it, which is a fun way to waste twenty minutes if you switch between machines.</p>
+
+<h2>Substitutions You'll Use Weekly</h2>
+
+<h3>Replace the first occurrence on each line</h3>
+
+<pre><code>sed 's/foo/bar/' file.txt</code></pre>
+
+<p>Simple, but worth being explicit: without <code>g</code>, this only replaces the first match per line. That matters when your lines have repeated tokens and you only want to touch the leading one.</p>
+<div class="ad-wrap"><div class="ad-slot">
+  <script type="text/javascript" src="https://data527.click/96cb2bf4ca5b000a7e72/791a2249e9/?placementName=default" async></script>
+</div>
+</div>
+</p>
+
+<h3>Replace all occurrences globally</h3>
+
+<pre><code>sed 's/foo/bar/g' file.txt</code></pre>
+
+<p>The workhorse. You'll use this to rename things across config files, swap environment variable names, fix consistent typos in docs.</p>
+
+<h3>Edit a file in place</h3>
+
+<pre><code># Linux
+sed -i 's/localhost/production.db/g' config.yml
+
+# macOS
+sed -i '' 's/localhost/production.db/g' config.yml</code></pre>
+
+<p>No temp file gymnastics. Just be aware there's no undo — run it without <code>-i</code> first to preview output.</p>
+
+<h3>Case-insensitive replacement</h3>
+
+<pre><code>sed 's/error/ERROR/Ig' log.txt</code></pre>
+
+<p>Handy when you're normalizing inconsistent casing across log files or user-generated content. The <code>I</code> flag handles this in GNU sed; on BSD/macOS sed, use lowercase <code>i</code> after the delimiter.</p>
+
+<h3>Delete lines matching a pattern</h3>
+
+<pre><code>sed '/^#/d' config.conf</code></pre>
+
+<p>This strips comment lines starting with <code>#</code>. Useful for piping a cleaned-up config somewhere without modifying the original. Combine with <code>-i</code> to strip all comments from a file permanently — though you probably want a backup first.</p>
+
+<h3>Strip trailing whitespace</h3>
+
+<pre><code>sed 's/[[:space:]]*$//' file.txt</code></pre>
+
+<p>A constant need when dealing with copy-pasted code, CSV exports, or files edited on Windows. The <code>[[:space:]]</code> POSIX class catches tabs too, not just spaces.</p>
+
+<h3>Remove blank lines</h3>
+
+<pre><code>sed '/^$/d' file.txt</code></pre>
+
+<p>Collapses files with excessive whitespace. Combine it with the trailing-whitespace strip to fully normalize a messy file in one pipe.</p>
+
+<h2>More Surgical Patterns</h2>
+
+<h3>Capture groups and back-references</h3>
+
+<pre><code>sed 's/\(.*\):\(.*\)/\2:\1/' pairs.txt</code></pre>
+
+<p>This swaps the two sides of a colon-delimited pair. In GNU sed you can use <code>-E</code> for extended regex and drop the backslashes on the parentheses:</p>
+
+<pre><code>sed -E 's/(.*?):(.*)/\2:\1/' pairs.txt</code></pre>
+
+<p>Back-references are where <code>sed</code> starts earning real respect. Use them to reformat dates, restructure CSV columns, or rearrange function argument order across a codebase.</p>
+
+<h3>Add a prefix to every line</h3>
+
+<pre><code>sed 's/^/    /' code.txt</code></pre>
+
+<p>Indents every line by four spaces. Useful when you're embedding output into Markdown or documentation and need consistent indentation fast.</p>
+
+<h3>Add a suffix to every line</h3>
+
+<pre><code>sed 's/$/,/' items.txt</code></pre>
+
+<p>Turn a plain list into a comma-appended list in one shot. Combine with head/tail tricks to handle the trailing comma problem for SQL inserts.</p>
+
+<h3>Replace only on lines matching a pattern</h3>
+
+<pre><code>sed '/DEBUG/s/false/true/g' app.conf</code></pre>
+
+<p>Address filtering. This only runs the substitution on lines that contain <code>DEBUG</code>. It's the feature most developers don't reach for until they've already written an ugly awk pipeline to do the same thing.</p>
+
+<h2>Chaining Substitutions</h2>
+
+<p>You don't have to run multiple <code>sed</code> calls. Use <code>-e</code> to chain expressions:</p>
+
+<pre><code>sed -e 's/foo/bar/g' -e 's/baz/qux/g' file.txt</code></pre>
+
+<p>Or, if you're doing a lot at once, drop them into a script file:</p>
+
+<pre><code>sed -f transforms.sed file.txt</code></pre>
+
+<p>Each line in <code>transforms.sed</code> is one expression, no <code>-e</code> required.</p>
+
+<h2>The One Flag to Not Forget</h2>
+
+<p>Run without <code>-i</code> and redirect to a new file when you're unsure:</p>
+
+<pre><code>sed 's/old/new/g' original.txt > modified.txt</code></pre>
+
+<p>Non-destructive, diff-able, and you still have the original. Automate with confidence once the output looks right. That's the workflow that keeps <code>sed</code> useful without being dangerous.</p></article></div>
+<footer class="wrap">© 2026 DevSnip Daily</footer>
+</body></html>

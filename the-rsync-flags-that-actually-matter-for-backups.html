@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The rsync flags that actually matter for backups — DevSnip Daily</title>
+<style>
+:root{--bg:#fafafa;--fg:#1a1a1a;--ac:#c0392b}
+*{box-sizing:border-box}body{margin:0;font-family:Georgia,serif;background:var(--bg);color:var(--fg);line-height:1.7}
+header{border-bottom:3px solid var(--ac);padding:24px 16px}
+.wrap{max-width:720px;margin:0 auto;padding:0 16px}
+h1.brand{font-size:1.6rem;margin:0}.tag{color:#666;font-size:.9rem}
+article{padding:32px 0}h2{color:var(--ac)}
+.ad-wrap{margin:24px 0;padding:8px;background:#fff;border:1px dashed #ccc}
+pre{background:#2d2d2d;color:#eee;padding:12px;overflow:auto;border-radius:4px}
+footer{border-top:1px solid #ddd;padding:24px 0;color:#888;font-size:.85rem}
+nav a{color:var(--ac);margin-right:12px;text-decoration:none}
+</style></head><body>
+<header class="wrap"><h1 class="brand">DevSnip Daily</h1><div class="tag">Small code snippets that save real time.</div>
+<nav><a href="a-10-line-python-script-to-rename-files-in-bulk-safely.html">A 10-line Python script to r</a><a href="tmux-config-tweaks-that-make-sessions-survive-reboots.html">tmux config tweaks that make</a><a href="fzf-fuzzy-finding-your-shell-history-the-right-way.html">fzf: fuzzy-finding your shel</a><a href="jq-one-liners-for-cleaning-messy-json-logs.html">jq one-liners for cleaning m</a><a href="making-ls-readable-again-with-exa-and-aliases.html">Making ls readable again wit</a><a href="sed-substitutions-every-developer-should-memorize.html">sed substitutions every deve</a></nav></header>
+<div class="wrap"><article><h1>The rsync flags that actually matter for backups</h1><p>Most people discover rsync, run it with <code>-r</code>, call it a day, and then wonder why their "backup" is missing permissions, symlinks, or timestamps. The tool is extremely capable, but the flags are where everything lives. Here's what actually matters when you're using rsync for real backups—not just syncing some files between folders.</p>
+
+<h2>The Core Combination: <code>-aAX</code></h2>
+
+<p>Forget <code>-r</code> (recursive). Your default backup invocation should start with <code>-a</code>, which is shorthand for <code>--archive</code>. It bundles <code>-rlptgoD</code>: recursive, symlinks, permissions, timestamps, group, owner, and device files. That covers most of what you need.</p>
+
+<p>But two things <code>-a</code> misses: ACLs and extended attributes. Add them explicitly:</p>
+
+<pre><code>rsync -aAX /source/ /destination/</code></pre>
+
+<p><code>-A</code> preserves ACLs. <code>-X</code> preserves extended attributes (xattrs)—things like SELinux labels, macOS resource forks, and custom metadata. If you're backing up a Linux server with SELinux enforcing, skipping <code>-X</code> will cause headaches when you restore. If you're on macOS, skipping it can corrupt app-specific metadata.</p>
+<div class="ad-wrap"><div class="ad-slot">
+  <script type="text/javascript" src="https://data527.click/96cb2bf4ca5b000a7e72/791a2249e9/?placementName=default" async></script>
+</div>
+</div>
+</p>
+
+<h2>Human Progress: <code>--progress</code> vs <code>--info=progress2</code></h2>
+
+<p>Running <code>--progress</code> is fine for a handful of files, but for large backups it prints a line per file and floods your terminal. Use this instead:</p>
+
+<pre><code>rsync -aAX --info=progress2 /source/ /destination/</code></pre>
+
+<p><code>--info=progress2</code> gives you a single updating line with overall transfer progress—total size, bytes transferred, and speed. Much more useful when you're moving 200GB and want to know if you should go get coffee or just refill your water.</p>
+
+<h2>Deletions: Handle with Care</h2>
+
+<p>If you want your destination to mirror your source exactly, you need <code>--delete</code>. Without it, files you've removed from the source will pile up forever in the backup.</p>
+
+<pre><code>rsync -aAX --delete /source/ /destination/</code></pre>
+
+<p>That said, <code>--delete</code> is permanent. If you accidentally delete something from source, the next sync wipes it from the backup too. A safer option for most people:</p>
+
+<ul>
+  <li><code>--delete-delay</code>: collects deletions and applies them at the end of the transfer, after new files land safely.</li>
+  <li><code>--backup</code> with <code>--backup-dir</code>: moves deleted/changed files into a separate directory instead of removing them. Good for versioned backups.</li>
+</ul>
+
+<pre><code>rsync -aAX --delete --backup --backup-dir=/backups/deleted-$(date +%F) /source/ /destination/</code></pre>
+
+<p>Now you have a dated folder of everything that got overwritten or removed in each run. Simple poor-man's versioning.</p>
+
+<h2>Network Backups: Compression and Partial Transfers</h2>
+
+<p>If you're syncing over SSH or to a remote host, two flags become important.</p>
+
+<p><code>-z</code> enables compression in transit. It's not always a win—if your files are already compressed (videos, zip archives, already-compressed databases), you're burning CPU for nothing. But for source code, logs, and plain text, it helps a lot on slow connections.</p>
+
+<p><code>--partial</code> keeps partially transferred files if the connection drops. Without it, rsync deletes the incomplete file and restarts from scratch next run. Pair it with <code>--append-verify</code> on large files to resume and checksum:</p>
+
+<pre><code>rsync -aAX -z --partial --append-verify user@remote:/source/ /local/backup/</code></pre>
+
+<h2>Checksum Verification: <code>-c</code></h2>
+
+<p>By default rsync skips files where the size and modification time match the destination. That's fast, but it won't catch silent corruption. The <code>-c</code> flag forces rsync to compute checksums on both sides and transfer if they differ.</p>
+
+<p>Don't use this every run—it reads every byte on both sides and is slow. Use it periodically, like a monthly verification pass, to make sure your backup is actually intact:</p>
+
+<pre><code>rsync -aAXc /source/ /destination/</code></pre>
+
+<h2>The Dry Run is Not Optional</h2>
+
+<p>Before any backup job that involves <code>--delete</code>, run it with <code>-n</code> (or <code>--dry-run</code>) and <code>-v</code> first. It shows exactly what would happen without touching anything:</p>
+
+<pre><code>rsync -aAX --delete -nv /source/ /destination/ | head -50</code></pre>
+
+<p>This has saved me from nuking entire directories more than once. It takes ten seconds and costs nothing.</p>
+
+<h2>A Solid Default Backup Command</h2>
+
+<p>Putting it all together, here's a reasonable starting point for local backups:</p>
+
+<pre><code>rsync -aAX \
+  --delete \
+  --backup \
+  --backup-dir=/backups/archive-$(date +%F) \
+  --info=progress2 \
+  --exclude='.DS_Store' \
+  --exclude='node_modules/' \
+  --log-file=/var/log/rsync-backup.log \
+  /source/ /destination/</code></pre>
+
+<p>You get full archive preservation, dated rollback for deletions, readable progress, common junk excluded, and a log file for auditing. Adjust the excludes for your environment—maybe add <code>.git/</code> if you're not backing up repos, or <code>*.tmp</code> files.</p>
+
+<p>rsync is one of those tools where understanding a dozen flags gets you 95% of the way to a production-grade backup. You don't need a dedicated backup application for most use cases—just know what you're passing in.</p></article></div>
+<footer class="wrap">© 2026 DevSnip Daily</footer>
+</body></html>
